@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aerial ASCII Ocean</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #000000;
+            overflow: hidden;
+            font-family: 'Courier New', Courier, monospace;
+            user-select: none;
+            color: white;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* --- Top Nav Wrapper --- */
+        #navControls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 20;
+            display: flex;
+            gap: 10px;
+        }
+
+        /* --- Icon Buttons --- */
+        .icon-btn {
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid hsl(0, 0%, 95%);
+            color: white;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover,
+        .icon-btn.active {
+            background: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+            border-color: white;
+        }
+
+        /* --- Panels (Shared Styles) --- */
+        .panel {
+            position: absolute;
+            top: 75px;
+            left: 20px;
+            width: 280px;
+            background: rgba(5, 5, 5, 0.9);
+            border: 1px solid #333;
+            border-left: 2px solid #fff;
+            /* Retro accent */
+            padding: 20px;
+            z-index: 15;
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+
+            /* Hidden State */
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(-10px);
+            transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        .panel.active {
+            opacity: 1;
+            pointer-events: all;
+            transform: translateY(0);
+        }
+
+        /* --- UI Controls --- */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            transition: opacity 0.3s ease, height 0.3s ease;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #ccc;
+        }
+
+        .value-display {
+            color: #26a69a;
+        }
+
+        /* Dropdown */
+        select {
+            appearance: none;
+            width: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='square' stroke-linejoin='miter'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 14px;
+            color: #ffffff;
+            border: 1px solid #555;
+            padding: 10px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            outline: none;
+            text-transform: uppercase;
+        }
+
+        select:hover {
+            border-color: #fff;
+        }
+
+        /* Sliders */
+        input[type=range] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 100%;
+            background: transparent;
+        }
+
+        input[type=range]:focus {
+            outline: none;
+        }
+
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%;
+            height: 4px;
+            cursor: pointer;
+            background: #333;
+        }
+
+        input[type=range]::-webkit-slider-thumb {
+            height: 16px;
+            width: 16px;
+            border: 1px solid #fff;
+            background: #000;
+            cursor: pointer;
+            -webkit-appearance: none;
+            margin-top: -6px;
+            transition: background 0.2s;
+        }
+
+        input[type=range]:hover::-webkit-slider-thumb {
+            background: #26a69a;
+        }
+
+        /* Switch */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 32px;
+            height: 16px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-toggle {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border: 1px solid #555;
+        }
+
+        .slider-toggle:before {
+            position: absolute;
+            content: "";
+            height: 8px;
+            width: 8px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+        }
+
+        input:checked+.slider-toggle {
+            background-color: #26a69a;
+            border-color: #26a69a;
+        }
+
+        input:checked+.slider-toggle:before {
+            transform: translateX(16px);
+        }
+
+        /* --- Info Panel Specifics --- */
+        .info-header {
+            font-size: 14px;
+            font-weight: 800;
+            text-transform: uppercase;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 5px;
+            color: #fff;
+        }
+
+        .info-text {
+            font-size: 11px;
+            line-height: 1.6;
+            color: #ccc;
+        }
+
+        .info-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 10px;
+            text-transform: uppercase;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-weight: 700;
+        }
+
+        .stat-val {
+            color: #26a69a;
+            font-weight: 700;
+        }
+
+        .author-block {
+            border-top: 1px solid #333;
+            padding-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .author-name {
+            font-size: 12px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .social-links {
+            display: flex;
+            gap: 10px;
+        }
+
+        .social-link {
+            font-size: 10px;
+            text-transform: uppercase;
+            text-decoration: none;
+            color: #fff;
+            background: #222;
+            padding: 6px 10px;
+            border: 1px solid #444;
+            transition: all 0.2s;
+        }
+
+        .social-link:hover {
+            background: #26a69a;
+            border-color: #26a69a;
+            color: #000;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Top Nav -->
+    <div id="navControls">
+        <!-- Settings Button -->
+        <div id="settingsBtn" class="icon-btn" onclick="togglePanel('settings')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path
+                    d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                </path>
+            </svg>
+        </div>
+        <!-- About Button -->
+        <div id="aboutBtn" class="icon-btn" onclick="togglePanel('about')">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Settings Overlay Panel -->
+    <div id="settingsPanel" class="panel">
+        <div class="control-group">
+            <div class="label-row"><span>View Mode</span></div>
+            <select id="modeSelect">
+                <option value="shore">Horizon Waves</option>
+                <option value="deep">Deep Ocean</option>
+            </select>
+        </div>
+
+        <div class="toggle-row">
+            <span>Interactive Wake</span>
+            <label class="switch">
+                <input type="checkbox" id="chaosToggle" checked>
+                <span class="slider-toggle"></span>
+            </label>
+        </div>
+
+        <hr style="border: 0; border-top: 1px solid #333; margin: 5px 0;">
+
+        <div class="control-group" id="grp-speed">
+            <div class="label-row">
+                <span>Flow Speed</span>
+                <span id="speedVal" class="value-display">1.2</span>
+            </div>
+            <input type="range" id="speedSlider" min="0.1" max="3.0" step="0.1" value="1.2">
+        </div>
+
+        <div class="control-group" id="grp-height">
+            <div class="label-row">
+                <span>Wave Height</span>
+                <span id="heightVal" class="value-display">260</span>
+            </div>
+            <input type="range" id="heightSlider" min="50" max="400" step="10" value="260">
+        </div>
+
+        <div class="control-group" id="grp-waviness">
+            <div class="label-row">
+                <span>Waviness</span>
+                <span id="wavinessVal" class="value-display">1.0</span>
+            </div>
+            <input type="range" id="wavinessSlider" min="0.1" max="3.0" step="0.1" value="1.0">
+        </div>
+
+        <div class="control-group" id="grp-organic">
+            <div class="label-row">
+                <span>Organic Noise</span>
+                <span id="organicVal" class="value-display">50%</span>
+            </div>
+            <input type="range" id="organicSlider" min="0" max="100" step="5" value="50">
+        </div>
+
+        <div class="control-group" id="grp-density">
+            <div class="label-row">
+                <span>Density Steps</span>
+                <span id="densityVal" class="value-display">10</span>
+            </div>
+            <input type="range" id="densitySlider" min="2" max="13" step="1" value="10">
+        </div>
+
+        <div class="control-group" id="grp-spread">
+            <div class="label-row">
+                <span>Vertical Spread</span>
+                <span id="spreadVal" class="value-display">250</span>
+            </div>
+            <input type="range" id="spreadSlider" min="50" max="1000" step="10" value="250">
+        </div>
+    </div>
+
+    <!-- About Overlay Panel -->
+    <div id="aboutPanel" class="panel">
+        <div class="info-header">About Experiment</div>
+        <p class="info-text">
+            This is a generative fluid simulation exploring retro-futurist aesthetics through ASCII density mapping.
+            Created in a collaborative rapid-prototyping session leveraging Google's Gemini 2.5 Flash model.
+        </p>
+
+        <p class="info-text" style="margin-top: 10px; border-left: 2px solid #333; padding-left: 8px;">
+            Original background animation concept iterated from <a href="https://v0nanobananapro.vercel.app/"
+                target="_blank" style="color: #26a69a; text-decoration: none; border-bottom: 1px dotted #26a69a;">Nano
+                Banana Pro</a>.
+        </p>
+
+        <hr style="border: 0; border-top: 1px solid #333; margin: 5px 0;">
+
+        <div class="info-stats">
+            <div class="stat-item">
+                <span class="stat-label">Model</span>
+                <span class="stat-val">Gemini 2.5 Flash</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Iterations</span>
+                <span class="stat-val">16 Queries</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Tech Stack</span>
+                <span class="stat-val">HTML5 Canvas (Vanilla)</span>
+            </div>
+        </div>
+
+        <div class="author-block">
+            <div class="author-name">Response IV</div>
+            <div style="font-size: 10px; color: #888;">Creative Tech Studio</div>
+            <div class="social-links">
+                <a href="https://x.com/responseIV" target="_blank" class="social-link">X / Twitter</a>
+                <a href="https://github.com/ResponseIV" target="_blank" class="social-link">GIT / GitHub</a>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const settingsPanel = document.getElementById('settingsPanel');
+        const aboutPanel = document.getElementById('aboutPanel');
+        const settingsBtn = document.getElementById('settingsBtn');
+        const aboutBtn = document.getElementById('aboutBtn');
+
+        const modeSelect = document.getElementById('modeSelect');
+        const chaosToggle = document.getElementById('chaosToggle');
+
+        // Control Groups
+        const grpHeight = document.getElementById('grp-height');
+        const grpSpread = document.getElementById('grp-spread');
+
+        // Inputs
+        const speedSlider = document.getElementById('speedSlider');
+        const heightSlider = document.getElementById('heightSlider');
+        const wavinessSlider = document.getElementById('wavinessSlider');
+        const densitySlider = document.getElementById('densitySlider');
+        const spreadSlider = document.getElementById('spreadSlider');
+        const organicSlider = document.getElementById('organicSlider');
+
+        // Values
+        const speedVal = document.getElementById('speedVal');
+        const heightVal = document.getElementById('heightVal');
+        const wavinessVal = document.getElementById('wavinessVal');
+        const densityVal = document.getElementById('densityVal');
+        const spreadVal = document.getElementById('spreadVal');
+        const organicVal = document.getElementById('organicVal');
+
+        let width, height;
+        let time = 0;
+        let currentMode = 'shore';
+        let isChaosEnabled = true;
+
+        const trail = [];
+        const MAX_TRAIL_LENGTH = 40;
+
+        const masterCharString = "   ·.:-=+*#%@8";
+        let currentCharMap = masterCharString;
+
+        const config = {
+            fontSize: 10,
+            gap: 8,
+
+            // Dynamic Params
+            baseSpeed: 0.01,
+            speedMultiplier: 1.2,
+
+            horizonAmp: 260,
+            waviness: 1.0,
+            gradientSpread: 250,
+            organic: 0.5, // 0.0 to 1.0
+
+            // Deep Ocean Params
+            waveScale: 0.03,
+
+            baseH: 174,
+            baseS: 70,
+        };
+
+        // --- UI Functions ---
+        function togglePanel(panelName) {
+            if (panelName === 'settings') {
+                const isActive = settingsPanel.classList.contains('active');
+
+                // Toggle Settings
+                settingsPanel.classList.toggle('active');
+                settingsBtn.classList.toggle('active');
+
+                // Force close About
+                aboutPanel.classList.remove('active');
+                aboutBtn.classList.remove('active');
+            } else if (panelName === 'about') {
+                // Toggle About
+                aboutPanel.classList.toggle('active');
+                aboutBtn.classList.toggle('active');
+
+                // Force close Settings
+                settingsPanel.classList.remove('active');
+                settingsBtn.classList.remove('active');
+            }
+        }
+
+        function updateDensityMap(steps) {
+            if (steps >= masterCharString.length) {
+                currentCharMap = masterCharString;
+                return;
+            }
+            let newMap = "";
+            const len = masterCharString.length;
+            for (let i = 0; i < steps; i++) {
+                const index = Math.floor(i * (len - 1) / (steps - 1));
+                newMap += masterCharString[index];
+            }
+            currentCharMap = newMap;
+        }
+
+        function updateUIForMode() {
+            if (currentMode === 'deep') {
+                grpHeight.classList.add('hidden');
+                grpSpread.classList.add('hidden');
+            } else {
+                grpHeight.classList.remove('hidden');
+                grpSpread.classList.remove('hidden');
+            }
+        }
+
+        // --- Event Listeners ---
+        modeSelect.addEventListener('change', (e) => {
+            currentMode = e.target.value;
+            updateUIForMode();
+        });
+
+        chaosToggle.addEventListener('change', (e) => {
+            isChaosEnabled = e.target.checked;
+            if (!isChaosEnabled) trail.length = 0;
+        });
+
+        // Sliders
+        speedSlider.addEventListener('input', (e) => {
+            config.speedMultiplier = parseFloat(e.target.value);
+            speedVal.innerText = config.speedMultiplier.toFixed(1);
+        });
+
+        heightSlider.addEventListener('input', (e) => {
+            config.horizonAmp = parseInt(e.target.value);
+            heightVal.innerText = config.horizonAmp;
+        });
+
+        wavinessSlider.addEventListener('input', (e) => {
+            config.waviness = parseFloat(e.target.value);
+            wavinessVal.innerText = config.waviness.toFixed(1);
+        });
+
+        organicSlider.addEventListener('input', (e) => {
+            config.organic = parseInt(e.target.value) / 100; // 0-100 -> 0.0-1.0
+            organicVal.innerText = e.target.value + '%';
+        });
+
+        densitySlider.addEventListener('input', (e) => {
+            const steps = parseInt(e.target.value);
+            densityVal.innerText = steps;
+            updateDensityMap(steps);
+        });
+
+        spreadSlider.addEventListener('input', (e) => {
+            config.gradientSpread = parseInt(e.target.value);
+            spreadVal.innerText = config.gradientSpread;
+        });
+
+        // Init
+        updateDensityMap(10);
+        updateUIForMode();
+
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            ctx.font = `${config.fontSize}px monospace`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        let lastMouseX = 0, lastMouseY = 0;
+        window.addEventListener('mousemove', (e) => {
+            if (!isChaosEnabled) return;
+            const dist = Math.hypot(e.clientX - lastMouseX, e.clientY - lastMouseY);
+            if (dist > 40) {
+                trail.push({
+                    x: e.clientX, y: e.clientY, age: 0, life: 90,
+                    vx: (e.clientX - lastMouseX) * 0.1,
+                    vy: (e.clientY - lastMouseY) * 0.1
+                });
+                if (trail.length > MAX_TRAIL_LENGTH) trail.shift();
+                lastMouseX = e.clientX;
+                lastMouseY = e.clientY;
+            }
+        });
+
+        // --- Noise ---
+        const Noise = (function () {
+            const p = new Uint8Array(512);
+            const permutation = [151, 160, 137, 91, 90, 15, 131, 13, 201, 95, 96, 53, 194, 233, 7, 225, 140, 36, 103, 30, 69, 142, 8, 99, 37, 240, 21, 10, 23, 190, 6, 148, 247, 120, 234, 75, 0, 26, 197, 62, 94, 252, 219, 203, 117, 35, 11, 32, 57, 177, 33, 88, 237, 149, 56, 87, 174, 20, 125, 136, 171, 168, 68, 175, 74, 165, 71, 134, 139, 48, 27, 166, 77, 146, 158, 231, 83, 111, 229, 122, 60, 211, 133, 230, 220, 105, 92, 41, 55, 46, 245, 40, 244, 102, 143, 54, 65, 25, 63, 161, 1, 216, 80, 73, 209, 76, 132, 187, 208, 89, 18, 169, 200, 196, 135, 130, 116, 188, 159, 86, 164, 100, 109, 198, 173, 186, 3, 64, 52, 217, 226, 250, 124, 123, 5, 202, 38, 147, 118, 126, 255, 82, 85, 212, 207, 206, 59, 227, 47, 16, 58, 17, 182, 189, 28, 42, 223, 183, 170, 213, 119, 248, 152, 2, 44, 154, 163, 70, 221, 153, 101, 155, 167, 43, 172, 9, 129, 22, 39, 253, 19, 98, 108, 110, 79, 113, 224, 232, 178, 185, 112, 104, 218, 246, 97, 228, 251, 34, 242, 193, 238, 210, 144, 12, 191, 179, 162, 241, 81, 51, 145, 235, 249, 14, 239, 107, 49, 192, 214, 31, 181, 199, 106, 157, 184, 84, 204, 176, 115, 121, 50, 45, 127, 4, 150, 254, 138, 236, 205, 93, 222, 114, 67, 29, 24, 72, 243, 141, 128, 195, 78, 66, 215, 61, 156, 180];
+            for (let i = 0; i < 256; i++) p[256 + i] = p[i] = permutation[i];
+            function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+            function lerp(t, a, b) { return a + t * (b - a); }
+            function grad(hash, x, y, z) {
+                const h = hash & 15;
+                const u = h < 8 ? x : y, v = h < 4 ? y : h == 12 || h == 14 ? x : z;
+                return ((h & 1) == 0 ? u : -u) + ((h & 2) == 0 ? v : -v);
+            }
+            return {
+                perlin3: function (x, y, z) {
+                    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255, Z = Math.floor(z) & 255;
+                    x -= Math.floor(x); y -= Math.floor(y); z -= Math.floor(z);
+                    const u = fade(x), v = fade(y), w = fade(z);
+                    const A = p[X] + Y, AA = p[A] + Z, AB = p[A + 1] + Z, B = p[X + 1] + Y, BA = p[B] + Z, BB = p[B + 1] + Z;
+                    return lerp(w, lerp(v, lerp(u, grad(p[AA], x, y, z), grad(p[BA], x - 1, y, z)),
+                        lerp(u, grad(p[AB], x, y - 1, z), grad(p[BB], x - 1, y - 1, z))),
+                        lerp(v, lerp(u, grad(p[AA + 1], x, y, z - 1), grad(p[BA + 1], x - 1, y, z - 1)),
+                            lerp(u, grad(p[AB + 1], x, y - 1, z - 1), grad(p[BB + 1], x - 1, y - 1, z - 1))));
+                }
+            };
+        })();
+
+        // --- Drawing Logic ---
+
+        function drawDeepOcean(x, y, i, j, noiseTime, scrollTime) {
+            let noiseX = i * config.waveScale * config.waviness;
+            let noiseY = j * config.waveScale * config.waviness;
+
+            // Mix between Sine (Order) and Noise (Chaos) based on Organic level
+            let orderSignal = Math.sin((j * 0.02) - scrollTime);
+            let chaosSignal = Noise.perlin3(noiseX, noiseY - (time * 0.1), noiseTime);
+
+            // Blend: (1-organic) * Sine + organic * Noise
+            let baseSignal = ((1 - config.organic) * orderSignal) + (config.organic * chaosSignal * 2);
+
+            let n2 = Noise.perlin3(noiseX * 3, noiseY * 3, time * 0.4);
+            // Higher organic = more n2 detail
+            let intensity = baseSignal + (n2 * 0.4 * config.organic);
+
+            return intensity;
+        }
+
+        function calculateSurfaceHeight(i, x) {
+            // Frequencies
+            const f1 = 0.002 * config.waviness;
+            const f2 = 0.005 * config.waviness;
+            const f3 = 0.001 * config.waviness;
+
+            // Pure Sine Waves (Order)
+            const swell1 = Math.sin(x * f1 + time * 0.8);
+            const swell2 = Math.sin(x * f2 - time * 0.5);
+            const swell3 = Math.sin(x * f3 + time * 0.2);
+
+            // Noise (Chaos)
+            const organicNoise = Noise.perlin3(i * f1, time * 0.15, 0);
+
+            // Blend Factor
+
+            let combinedHeight =
+                (swell1 * config.horizonAmp * 0.5)
+                + (swell2 * config.horizonAmp * 0.3)
+                + (swell3 * config.horizonAmp * 0.2);
+
+            // Add randomness based on slider
+            combinedHeight += organicNoise * 60 * config.organic;
+
+            return (height * 0.6) + combinedHeight;
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, width, height);
+
+            time += config.baseSpeed * config.speedMultiplier;
+
+            if (isChaosEnabled) {
+                for (let i = trail.length - 1; i >= 0; i--) {
+                    trail[i].age++;
+                    trail[i].x += trail[i].vx;
+                    trail[i].y += trail[i].vy;
+                    trail[i].vx *= 0.9;
+                    trail[i].vy *= 0.9;
+                    if (trail[i].age > trail[i].life) {
+                        trail.splice(i, 1);
+                    }
+                }
+            }
+
+            const cols = Math.ceil(width / config.gap);
+            const rows = Math.ceil(height / config.gap);
+
+            const noiseTime = time * 0.2;
+            const scrollTime = time * 1.5;
+
+            let surfaceHeights = [];
+            if (currentMode === 'shore') {
+                for (let i = 0; i < cols; i++) {
+                    surfaceHeights[i] = calculateSurfaceHeight(i, i * config.gap);
+                }
+            }
+
+            for (let i = 0; i < cols; i++) {
+                const x = i * config.gap;
+                const surfaceY = (currentMode === 'shore') ? surfaceHeights[i] : 0;
+
+                for (let j = 0; j < rows; j++) {
+                    const y = j * config.gap;
+
+                    let intensity = 0;
+
+                    if (currentMode === 'deep') {
+                        intensity = drawDeepOcean(x, y, i, j, noiseTime, scrollTime);
+                    } else {
+                        const dist = y - surfaceY;
+
+                        if (dist < -15) {
+                            intensity = -2.0;
+                        } else if (dist < 0) {
+                            const t = 1 - (Math.abs(dist) / 15);
+                            intensity = -0.8 + (t * 0.4);
+                        } else {
+                            const depth = Math.min(1, dist / config.gradientSpread);
+                            intensity = -0.8 + (depth * 2.0);
+                        }
+                    }
+
+                    if (isChaosEnabled && trail.length > 0) {
+                        let fluidDisplacement = 0;
+                        for (let t = 0; t < trail.length; t++) {
+                            const point = trail[t];
+                            const dx = x - point.x;
+                            const dy = y - point.y;
+                            const distSq = dx * dx + dy * dy;
+                            if (distSq < 15000) {
+                                const lifeRatio = Math.max(0, 1 - (point.age / point.life));
+                                const distFactor = Math.exp(-distSq / 4000);
+                                const dist = Math.sqrt(distSq);
+                                const ripple = Math.sin(dist * 0.08 - (time * 4));
+                                fluidDisplacement += distFactor * lifeRatio * ripple * 0.3;
+                            }
+                        }
+                        intensity += fluidDisplacement;
+                    }
+
+                    let mapValue = (intensity + 1.5) / 3.0;
+                    if (mapValue < 0) mapValue = 0;
+                    if (mapValue > 1) mapValue = 1;
+
+                    let charIndex = Math.floor(mapValue * (currentCharMap.length));
+                    if (charIndex >= currentCharMap.length) charIndex = currentCharMap.length - 1;
+
+                    if (charIndex <= 0) continue;
+
+                    const char = currentCharMap[charIndex];
+
+                    const l = 10 + (mapValue * 55);
+                    const alpha = 0.2 + (mapValue * 0.8);
+
+                    ctx.fillStyle = `hsla(${config.baseH}, ${config.baseS}%, ${l}%, ${alpha})`;
+                    ctx.fillText(char, x, y);
+                }
+            }
+
+            requestAnimationFrame(draw);
+        }
+
+        draw();
+
+    </script>
+</body>
+
+</html>
